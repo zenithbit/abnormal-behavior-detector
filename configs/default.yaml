@@ -48,3 +48,6 @@ train:
   threshold: youden       # youden (balanced, default) | f1
   seed: 42
   device: auto
+
+linear:                   # `abd linear`: logistic-regression baseline on mean+max pooled features
+  C: 1.0                  # inverse L2 strength (features are standardised first)

@@ -25,11 +25,11 @@ for mode in "${MODES[@]}"; do
 done
 
 "$PY" - <<'PY'
-import json, glob
+import json, glob, os
 rows = []
 for f in glob.glob("outputs/runs/cmp_*/cv_summary.json"):
     d = json.load(open(f)); g = lambda k: (d[k]["mean"], d[k]["std"])
-    rows.append((f.split("/")[2][4:], g("anomaly.roc_auc"), g("anomaly.balanced_accuracy"),
+    rows.append((os.path.basename(os.path.dirname(f))[4:], g("anomaly.roc_auc"), g("anomaly.balanced_accuracy"),
                  g("behavior.accuracy"), g("end_to_end.accuracy"), g("end_to_end.macro_f1")))
 rows.sort(key=lambda r: -r[5][0])
 print(f"\n{'model':<22}{'AUC':>14}{'bal.acc':>14}{'behavior':>14}{'e2e acc':>14}{'e2e F1':>14}")

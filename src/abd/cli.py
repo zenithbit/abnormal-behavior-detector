@@ -218,7 +218,10 @@ def cmd_cv(cfg, args):
         with open(run_dir / "metrics.json", "w") as fh:
             json.dump(result, fh, indent=2)
         per_fold.append(result["test"])
+    _cv_summary(per_fold, base)
 
+
+def _cv_summary(per_fold, base: Path):
     keys = [("anomaly", "precision"), ("anomaly", "recall"), ("anomaly", "specificity"),
             ("anomaly", "balanced_accuracy"), ("anomaly", "f1"), ("anomaly", "roc_auc"),
             ("anomaly", "pr_auc"), ("behavior", "accuracy"), ("behavior", "macro_f1"),
@@ -232,6 +235,42 @@ def cmd_cv(cfg, args):
     with open(base / "cv_summary.json", "w") as fh:
         json.dump(summary, fh, indent=2)
     print(f"\ncv -> {base}")
+
+
+def cmd_linear(cfg, args):
+    """Logistic-regression baseline: same split / threshold rule / metrics as `train` (or `cv` with --folds)."""
+    from .data.split import kfold_splits
+    from .train import linear
+    from .train.dataset import FeatureDataset
+    from .train.trainer import evaluate
+
+    records = _manifest(cfg)
+    mode = cfg["model"]["input"]
+    if args.folds:
+        folds = kfold_splits(records, args.folds, cfg["split"]["val_ratio"], cfg["split"]["seed"])
+    else:
+        folds = [_split(cfg)]
+    base = work_path(cfg, "runs", args.name, "x").parent
+    per_fold = []
+    for fold in folds:
+        classes = fold["behavior_classes"]
+        train_ds, val_ds, test_ds = (FeatureDataset(_subset(records, fold[n]), _feature_dir(cfg), classes, mode)
+                                     for n in ("train", "val", "test"))
+        run_dir = base / f"fold{fold['fold']}" if args.folds else base
+        run_dir.mkdir(parents=True, exist_ok=True)
+        model = linear.fit(cfg, train_ds, val_ds, classes)
+        linear.save(model, run_dir / "model.pkl")
+        result = {"threshold": model["threshold"],
+                  "val": evaluate(linear.predict(model, val_ds), classes, model["threshold"]),
+                  "test": evaluate(linear.predict(model, test_ds), classes, model["threshold"])}
+        with open(run_dir / "metrics.json", "w") as fh:
+            json.dump(result, fh, indent=2)
+        per_fold.append(result["test"])
+        if not args.folds:
+            _print_metrics(result)
+            print(f"\nrun -> {run_dir}")
+    if args.folds:
+        _cv_summary(per_fold, base)
 
 
 def _print_metrics(result):
@@ -378,6 +417,10 @@ def main(argv=None):
     cv.add_argument("--name", default="cv")
     cv.add_argument("--folds", type=int, default=5)
 
+    lr = sub.add_parser("linear", help="logistic-regression baseline on mean+max pooled features")
+    lr.add_argument("--name", default="linear")
+    lr.add_argument("--folds", type=int, default=0, help="k-fold CV instead of the fixed split")
+
     ev = sub.add_parser("evaluate")
     ev.add_argument("--ckpt", required=True)
     ev.add_argument("--split", default="test", choices=["train", "val", "test"])
@@ -400,7 +443,7 @@ def main(argv=None):
     cfg = load_config(args.config, args.set)
     {
         "index": cmd_index, "split": cmd_split, "track": cmd_track, "extract": cmd_extract,
-        "train": cmd_train, "cv": cmd_cv, "evaluate": cmd_evaluate, "pseudo-label": cmd_pseudo_label, "infer": cmd_infer,
+        "train": cmd_train, "cv": cmd_cv, "linear": cmd_linear, "evaluate": cmd_evaluate, "pseudo-label": cmd_pseudo_label, "infer": cmd_infer,
     }[args.cmd](cfg, args)
 
 
