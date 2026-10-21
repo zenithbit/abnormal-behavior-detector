@@ -73,10 +73,12 @@ def render_tracks(video_path: str | Path, tracks: np.ndarray, out_path: str | Pa
 
     `caption(frame_idx) -> (text, bgr_color)` adds a banner, e.g. the anomaly score.
     """
+    out_path = Path(out_path)
+    tmp_path = out_path.with_name(out_path.stem + ".mp4v.mp4")
     cap = cv2.VideoCapture(str(video_path))
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    writer = cv2.VideoWriter(str(tmp_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
     by_frame: dict[int, np.ndarray] = {}
     for f in np.unique(tracks[:, 0]).astype(int):
         by_frame[f] = tracks[tracks[:, 0] == f]
@@ -104,3 +106,19 @@ def render_tracks(video_path: str | Path, tracks: np.ndarray, out_path: str | Pa
         i += 1
     cap.release()
     writer.release()
+    to_h264(tmp_path, out_path)
+
+
+def to_h264(src: Path, dst: Path) -> None:
+    """Re-encode OpenCV's mp4v output to H.264 (plays in browsers and stock players); keep mp4v on failure."""
+    import subprocess
+
+    try:
+        import imageio_ffmpeg
+
+        subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(src),
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
+                       check=True)
+        src.unlink()
+    except Exception:
+        src.replace(dst)

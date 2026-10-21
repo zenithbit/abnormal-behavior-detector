@@ -9,6 +9,7 @@ dependencies = [
     "ultralytics>=8.2",
     "lap>=0.5.12",          # ByteTrack assignment (ultralytics tries to pip-install it at runtime otherwise)
     "opencv-python>=4.8",
+    "imageio-ffmpeg",       # bundled ffmpeg: re-encode renders to H.264 so any player opens them
     "numpy",
     "scikit-learn",
     "pyyaml",

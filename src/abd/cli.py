@@ -5,6 +5,7 @@ Pipeline order:  index -> split -> track -> extract -> train -> evaluate / pseud
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import logging
 from pathlib import Path
@@ -281,7 +282,11 @@ def cmd_infer(cfg, args):
 
     device = resolve_device(cfg["train"]["device"])
     model, ckpt = load_checkpoint(args.ckpt, device)
-    tcfg = ckpt["config"]  # use the sampling/backbone the model was trained with
+    # Sampling / backbone / tracker settings must match training, so they come from the checkpoint.
+    # Machine-specific settings (devices, batch size, detector weights path) come from this run's config.
+    tcfg = copy.deepcopy(ckpt["config"])
+    tcfg["features"].update(device=cfg["features"]["device"], batch_size=cfg["features"]["batch_size"])
+    tcfg["tracking"]["model"] = cfg["tracking"]["model"]
     meta = probe(Path(args.video))
     if meta is None:
         raise SystemExit(f"cannot read {args.video}")
