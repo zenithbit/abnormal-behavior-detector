@@ -44,14 +44,13 @@ flowchart TD
 **Windows** (PowerShell):
 ```powershell
 winget install --id Git.Git -e                    # kèm Git Bash (scripts/*.sh chạy trong Git Bash)
-winget install --id GitHub.cli -e                  # để clone repo private
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 nvidia-smi                                         # phải thấy GPU; driver cần hỗ trợ CUDA 12.4 (>= 551)
 ```
 
 **macOS**:
 ```bash
-brew install uv gh git
+brew install uv git
 ```
 
 **Linux + NVIDIA**:
@@ -63,8 +62,7 @@ nvidia-smi
 ## 1. Clone repo + môi trường Python
 
 ```bash
-gh auth login
-gh repo clone zenithbit/abnormal-behavior-detector
+git clone https://github.com/zenithbit/abnormal-behavior-detector.git
 cd abnormal-behavior-detector
 uv venv --python 3.11 .venv
 ```
@@ -168,6 +166,17 @@ scripts/pack_demo.sh outputs/runs/final \
 4. Dự phòng: trình chiếu thẳng `samples\rendered\`.
 
 Chi tiết: [`demo/README_DEMO.md`](../demo/README_DEMO.md).
+
+## Tài khoản / key cần có
+
+**Không cần API key hay token nào.** Repo public, clone không cần đăng nhập GitHub.
+Mọi trọng số đều tự tải miễn phí lần đầu chạy (cần internet):
+
+- S3D (Kinetics-400) — torchvision, lưu vào `~/.cache/torch/hub/checkpoints/`
+- YOLO11n — ultralytics, lưu `yolo11n.pt` vào thư mục đang chạy
+
+Chỉ cần quyền tải 2 file dữ liệu dưới đây (người giữ dự án gửi link Google Drive, chia sẻ dạng
+"Bất kỳ ai có đường liên kết"). Dataset gốc cũng tải được từ Kaggle (cần tài khoản Kaggle miễn phí).
 
 ## Không có trong git
 
