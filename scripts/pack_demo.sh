@@ -4,6 +4,7 @@
 #   the videos are copied as live-demo inputs AND pre-rendered here as a fallback.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/_env.sh
 RUN=${1:?run dir, e.g. outputs/runs/baseline}; shift
 [ -f "$RUN/best.pt" ] || { echo "no $RUN/best.pt"; exit 1; }
 B=dist/abd_demo
@@ -16,7 +17,7 @@ cp demo/setup.ps1 demo/demo.ps1 demo/setup.bat demo/demo.bat demo/README_DEMO.md
 cp "$RUN/best.pt" "$B/models/"
 for f in metrics.json history.json; do [ -f "$RUN/$f" ] && cp "$RUN/$f" "$B/models/"; done
 for d in outputs/runs/cv_*; do [ -f "$d/cv_summary.json" ] && cp "$d/cv_summary.json" "$B/models/$(basename "$d")_summary.json"; done
-cp ~/.cache/torch/hub/checkpoints/s3d-*.pth "$B/weights/torch/hub/checkpoints/"
+cp "${TORCH_HOME:-$HOME/.cache/torch}"/hub/checkpoints/s3d-*.pth "$B/weights/torch/hub/checkpoints/"
 cp yolo11n.pt "$B/weights/"
 
 for v in "$@"; do
@@ -25,9 +26,9 @@ for v in "$@"; do
   name=${name// /_}
   cp "$v" "$B/samples/inputs/$name.mp4"
   echo "pre-rendering $name ..."
-  .venv/bin/abd --set features.batch_size=2 infer --ckpt "$RUN/best.pt" --video "$B/samples/inputs/$name.mp4" \
+  "$ABD" --set features.batch_size=2 infer --ckpt "$RUN/best.pt" --video "$B/samples/inputs/$name.mp4" \
       --render "$B/samples/rendered/${name}_result.mp4" 2>/dev/null | grep -v '^rendered -> ' > "$B/samples/rendered/${name}_result.json"
 done
 
-(cd dist && zip -qr abd_demo.zip abd_demo)
+"$PY" -c "import shutil; shutil.make_archive('dist/abd_demo', 'zip', 'dist', 'abd_demo')"
 echo "dist/abd_demo.zip ($(du -h dist/abd_demo.zip | cut -f1))"

@@ -3,6 +3,7 @@
 # usage: scripts/compare_models.sh [frame person both]
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/_env.sh
 MODES=("$@"); [ $# -eq 0 ] && MODES=(frame person both)
 
 # name | overrides  (best head settings from the frame-only sweep + the original default)
@@ -18,12 +19,12 @@ for mode in "${MODES[@]}"; do
     name=${v%%|*}; args=()
     for kv in ${v#*|}; do args+=(--set "$kv"); done
     echo "cv $mode/$name ..."
-    .venv/bin/abd --set "model.input=$mode" "${args[@]}" cv --name "cmp_${mode}_${name}" --folds 5 >/dev/null 2>&1 \
+    "$ABD" --set "model.input=$mode" "${args[@]}" cv --name "cmp_${mode}_${name}" --folds 5 >/dev/null 2>&1 \
       || echo "  FAILED (person features missing? run extract with streams [frame, person])"
   done
 done
 
-.venv/bin/python - <<'PY'
+"$PY" - <<'PY'
 import json, glob
 rows = []
 for f in glob.glob("outputs/runs/cmp_*/cv_summary.json"):

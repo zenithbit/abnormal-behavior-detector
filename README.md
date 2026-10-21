@@ -4,6 +4,7 @@ Nhận một video → trả lời **có bất thường không** và **hành vi
 
 - Thiết kế gốc: [`abnormal_behavior_detection_system_design.md`](abnormal_behavior_detection_system_design.md)
 - Các quyết định khi hiện thực hoá (và chỗ khác thiết kế gốc): [`docs/decisions.md`](docs/decisions.md)
+- Trạng thái hiện tại, kết quả và việc tiếp theo (kể cả cài trên Windows): [`docs/STATUS.md`](docs/STATUS.md)
 
 ```
 video ─► YOLO (person) ─► ByteTrack ─► person clips ┐

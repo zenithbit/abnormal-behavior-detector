@@ -4,6 +4,7 @@
 set -euo pipefail
 ZIP=${1:?abd_results.zip path}
 cd "$(dirname "$0")/.."
+source scripts/_env.sh
 OUT=outputs
 if [ -d "$OUT/features" ] || [ -d "$OUT/runs" ]; then
   BACKUP="$OUT.bak.$(date +%Y%m%d-%H%M%S)"
@@ -11,7 +12,7 @@ if [ -d "$OUT/features" ] || [ -d "$OUT/runs" ]; then
   mv "$OUT" "$BACKUP"
 fi
 mkdir -p "$OUT"
-unzip -q "$ZIP" -d "$OUT"
+"$PY" -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$ZIP" "$OUT"
 echo "features: $(find "$OUT/features" -name '*.npz' | wc -l | tr -d ' ') videos"
 echo "runs:     $(ls "$OUT/runs" 2>/dev/null | tr '\n' ' ')"
 for f in "$OUT"/runs/*/cv_summary.json; do [ -e "$f" ] && echo "cv summary: $f"; done
