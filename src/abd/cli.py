@@ -136,7 +136,9 @@ def cmd_extract(cfg, args):
     for rec in tqdm(records, desc="extract"):
         out = out_dir / f"{rec.video_id}.npz"
         if out.exists() and not args.overwrite:
-            continue
+            # a frame-only file is incomplete once the person stream is requested
+            if not use_person or "person" in np.load(out).files:
+                continue
         tracks = None
         if use_person:
             tp = _tracks_dir(cfg) / f"{rec.video_id}.npy"
