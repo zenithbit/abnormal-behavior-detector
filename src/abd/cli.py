@@ -5,7 +5,6 @@ Pipeline order:  index -> split -> track -> extract -> train -> evaluate / pseud
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import logging
 from pathlib import Path
@@ -326,66 +325,14 @@ def cmd_pseudo_label(cfg, args):
 
 
 def cmd_infer(cfg, args):
-    import torch
+    from .inference import Analyzer
 
-    from .data.index import probe
-    from .detection.tracker import render_tracks
-    from .features.extract import extract_video
-    from .train.pseudo_label import candidate_segments, runs_to_time
-    from .train.trainer import load_checkpoint
-
-    device = resolve_device(cfg["train"]["device"])
-    model, ckpt = load_checkpoint(args.ckpt, device)
-    # Sampling / backbone / tracker settings must match training, so they come from the checkpoint.
-    # Machine-specific settings (devices, batch size, detector weights path) come from this run's config.
-    tcfg = copy.deepcopy(ckpt["config"])
-    tcfg["features"].update(device=cfg["features"]["device"], batch_size=cfg["features"]["batch_size"])
-    tcfg["tracking"]["model"] = cfg["tracking"]["model"]
-    meta = probe(Path(args.video))
-    if meta is None:
-        raise SystemExit(f"cannot read {args.video}")
-    n, fps, w, _h = meta
-    mode = tcfg["model"]["input"]
-    tracks = None
-    if mode != "frame" or args.render:
-        tracks = _tracker(tcfg).track_video(args.video, tcfg["tracking"]["min_track_len"])
-    smp, f = tcfg["sampling"], tcfg["features"]
-    from .features.backbone import ClipEncoder
-    encoder = ClipEncoder(f["backbone"], resolve_device(f["device"]), f["batch_size"])
-    feats = extract_video(args.video, n, fps, w, encoder, smp["num_segments"], smp["clip_len"],
-                          smp["max_frame_side"], tracks if mode != "frame" else None,
-                          f["max_persons"], f["crop_margin"])
-    batch = {k: torch.from_numpy(v)[None].to(device) for k, v in feats.items()
-             if k in {"frame", "person", "person_mask"}}
-    with torch.no_grad():
-        o = model(batch)
-    score = float(torch.sigmoid(o["video_logit"])[0])
-    seg = torch.sigmoid(o["segment_logits"])[0].cpu().numpy()
-    probs = torch.softmax(o["behavior_logits"], -1)[0].cpu().numpy()
-    thr = ckpt["threshold"]
-    is_anom = score >= thr
-    classes = ckpt["behavior_classes"]
-    behavior = classes[int(probs.argmax())] if is_anom and classes else "Normal"
-    result = {
-        "video": args.video,
-        "anomaly": bool(is_anom),
-        "behavior": behavior,
-        "confidence": round(float(probs.max()) * score if is_anom else 1 - score, 4),
-        "anomaly_score": round(score, 4),
-        "threshold": round(thr, 4),
-        "behavior_probs": {c: round(float(p), 4) for c, p in zip(classes, probs)},
-        "segments": runs_to_time(candidate_segments(seg, thr), feats["bounds"], fps, seg),
-    }
+    try:
+        result = Analyzer(cfg, args.ckpt).analyze(args.video, args.render)
+    except ValueError as e:
+        raise SystemExit(str(e))
     print(json.dumps(result, indent=2, ensure_ascii=False))
     if args.render:
-        bounds = feats["bounds"]
-
-        def caption(i):
-            s = int(np.clip(np.searchsorted(bounds[:, 1], i, side="right"), 0, len(seg) - 1))
-            col = (0, 0, 255) if seg[s] >= thr else (0, 200, 0)
-            return f"{behavior if is_anom else 'Normal'} | segment score {seg[s]:.2f}", col
-
-        render_tracks(args.video, tracks, args.render, caption)
         print(f"rendered -> {args.render}")
 
 
