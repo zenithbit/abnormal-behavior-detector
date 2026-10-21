@@ -10,3 +10,4 @@ outputs/
 .DS_Store
 *.egg-info/
 archive.zip
+dist/

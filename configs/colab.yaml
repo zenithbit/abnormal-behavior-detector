@@ -1,0 +1,12 @@
+# Colab (CUDA GPU). Outputs go straight to Google Drive so a disconnect loses nothing:
+# track/extract skip videos that are already done when re-run.
+paths:
+  dataset_root: /content/data/Ano-AAD
+  work_dir: /content/drive/MyDrive/abd/outputs
+
+features:
+  batch_size: 16
+  device: cuda
+
+train:
+  device: cuda
