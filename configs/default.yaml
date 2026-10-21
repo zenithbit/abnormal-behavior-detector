@@ -1,0 +1,48 @@
+# Paths are relative to the working directory unless absolute.
+paths:
+  dataset_root: data/Ano-AAD          # normal/  abnormal/<Class>/
+  work_dir: outputs                   # manifest, splits, tracks, features, runs
+
+split:
+  val_ratio: 0.15
+  test_ratio: 0.15
+  seed: 42
+
+sampling:
+  num_segments: 32        # S: segments per video (MIL instances)
+  clip_len: 16            # frames per clip fed to the backbone
+  max_frame_side: 640     # frames are downscaled to this on decode
+
+tracking:
+  model: yolo11n.pt       # person detector (class 0 only)
+  tracker: bytetrack.yaml
+  conf: 0.3
+  fps: 10                 # run detector/tracker at this rate
+  min_track_len: 5        # drop tracks shorter than this (in tracked frames)
+
+features:
+  backbone: s3d           # s3d (1024-d, I3D family) | r3d_18 (512-d, fast)
+  streams: [frame, person]
+  max_persons: 4          # K tracks kept per segment
+  crop_margin: 0.2        # enlarge person box by this fraction
+  batch_size: 2           # clips per backbone forward; 2 fits an 8GB M1, raise on a real GPU
+  device: auto            # auto | cpu | mps | cuda
+
+model:
+  input: frame            # frame | person | both
+  d_model: 256
+  n_layers: 2
+  n_heads: 4
+  dropout: 0.3
+  topk_ratio: 0.125       # MIL: top-k = ceil(S * ratio) segments
+
+train:
+  epochs: 60
+  batch_size: 16
+  lr: 3.0e-4
+  weight_decay: 1.0e-2
+  lambda_anomaly: 1.0
+  lambda_behavior: 1.0
+  patience: 12            # early stopping on val PR-AUC
+  seed: 42
+  device: auto
