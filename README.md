@@ -87,6 +87,24 @@ Output `infer`:
 Dataset lớn nên chạy `track` + `extract` trên GPU CUDA (Colab/cloud), copy `outputs/features` về
 và train head trên máy. `features.backbone=r3d_18` nhanh hơn để debug.
 
+## Chạy trên Google Colab (GPU)
+
+Phần nặng (tracking + trích feature) chạy trên Colab, kết quả mang về máy.
+
+1. Trên máy: đóng gói code (chỉ code đã commit)
+   ```bash
+   scripts/pack_code.sh
+   ```
+2. Tạo thư mục `MyDrive/abd/` trên Google Drive, upload `archive.zip` (dataset) và `dist/abd_code.zip`.
+3. Mở [`notebooks/colab_pipeline.ipynb`](notebooks/colab_pipeline.ipynb) trên Colab
+   (File → Upload notebook), chọn GPU T4, **Run all**. Bị ngắt thì Run all lại — video đã xong được bỏ qua.
+4. Xem vài video trong `MyDrive/abd/outputs/vis/` để kiểm tra tracking.
+5. Tải `MyDrive/abd/abd_results.zip` về thư mục project, rồi:
+   ```bash
+   scripts/import_results.sh abd_results.zip
+   ```
+   `outputs/` cũ được đổi tên thành `outputs.bak.<thời gian>`. Sau đó train / cv / infer trên máy như bình thường.
+
 ## Test
 
 ```bash
