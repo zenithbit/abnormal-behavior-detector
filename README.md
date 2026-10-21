@@ -5,6 +5,8 @@ Nhận một video → trả lời **có bất thường không** và **hành vi
 - Thiết kế gốc: [`abnormal_behavior_detection_system_design.md`](abnormal_behavior_detection_system_design.md)
 - Các quyết định khi hiện thực hoá (và chỗ khác thiết kế gốc): [`docs/decisions.md`](docs/decisions.md)
 - Trạng thái hiện tại, kết quả và việc tiếp theo (kể cả cài trên Windows): [`docs/STATUS.md`](docs/STATUS.md)
+- **Setup máy mới + flow chart từng bước**: [`docs/SETUP.md`](docs/SETUP.md)
+- Kết quả so sánh model: [`results/README.md`](results/README.md)
 
 ```
 video ─► YOLO (person) ─► ByteTrack ─► person clips ┐
@@ -52,6 +54,7 @@ abd --set model.input=frame  train --name baseline
 abd --set model.input=person train --name person
 abd --set model.input=both   train --name both
 abd cv --name cv_frame --folds 5          # 5-fold CV, mean ± std (nên dùng: dataset nhỏ)
+abd --set model.input=both linear --name lr_both    # baseline logistic regression (--folds 5 cho CV)
 abd evaluate --ckpt outputs/runs/both/best.pt --split test
 abd pseudo-label --ckpt outputs/runs/both/best.pt      # đoạn thời gian nghi bất thường (pseudo label)
 abd infer --ckpt outputs/runs/both/best.pt --video x.mp4 --render x_out.mp4

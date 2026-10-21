@@ -18,29 +18,20 @@
   - Head nơ-ron chưa thắng logistic regression → nút thắt là feature/dữ liệu, không phải head.
 - Quyết định của người dùng: **giữ 9 lớp**, chờ luồng person từ Colab rồi chọn model tốt nhất.
 
-## Đang chạy
+## Đã xong trên Windows (GTX 1070) — 2026-10-22
 
-- Colab (`notebooks/colab_pipeline.ipynb`): track + extract luồng frame + person → `MyDrive/abd/abd_results.zip`.
+- Import `abd_results.zip` từ Colab (feature S3D frame + person, 395 video).
+- `scripts/compare_models.sh`: 3 luồng × 4 head, 5-fold CV. NN tốt nhất `both_notf` (e2e F1 0.355 ± 0.059).
+- Model cuối `final` (both_notf) trên test: e2e F1 0.251 (val 0.445) — test nhỏ, dao động mạnh.
+- Thêm `abd linear` (logistic regression trên mean+max pooling). **LR both tốt nhất**:
+  CV e2e F1 0.464 ± 0.024, test 0.370.
+- Bảng đầy đủ: [`results/README.md`](../results/README.md). Setup máy mới + flow: [`SETUP.md`](SETUP.md).
 
-## Việc tiếp theo (trên máy Windows)
+## Việc tiếp theo
 
-1. Cài đặt (PowerShell, trong thư mục repo):
-   ```powershell
-   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-   uv venv --python 3.11 .venv
-   uv pip install --python .venv\Scripts\python.exe torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124
-   uv pip install --python .venv\Scripts\python.exe -e ".[dev]"
-   .venv\Scripts\python.exe -c "import torch; print(torch.cuda.is_available())"
-   ```
-   Các script `scripts/*.sh` chạy trong **Git Bash** (tự nhận `.venv\Scripts`).
-2. Tải `abd_results.zip` từ Drive về thư mục repo → (Git Bash) `scripts/import_results.sh abd_results.zip`.
-3. `scripts/compare_models.sh` → chọn cấu hình thắng (bảng sắp theo end-to-end macro-F1).
-4. Train model cuối với cấu hình đó: `abd --set model.input=<mode> ... train --name final`.
-5. Chọn 4–5 video **trong tập test** (`outputs/splits.json`), rồi
-   `scripts/pack_demo.sh outputs/runs/final <videos...>` → `dist/abd_demo.zip`.
-   Trên chính máy Windows có GPU thì có thể demo trực tiếp bằng
-   `abd infer --ckpt outputs/runs/final/best.pt --video x.mp4 --render x_out.mp4`.
-6. Nếu kịp: thêm baseline logistic regression vào CLI (đang tốt nhất ở end-to-end).
+1. Quyết định model cho demo: LR both tốt hơn rõ nhưng chỉ chấm điểm mức video (không định vị đoạn).
+   Hướng khả thi: LR cho anomaly + behavior, NN `final` chỉ để lấy điểm từng segment → cần thêm hỗ trợ LR trong `abd infer`.
+2. Đóng gói demo: cần video gốc (`archive.zip` → `data/`), `yolo11n.pt`, rồi `scripts/pack_demo.sh` (xem [`SETUP.md`](SETUP.md) bước 6).
 
 ## Không có trong git
 
