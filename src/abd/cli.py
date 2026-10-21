@@ -179,6 +179,45 @@ def cmd_train(cfg, args):
     print(f"\nrun -> {run_dir}")
 
 
+def cmd_cv(cfg, args):
+    """Stratified k-fold CV: every video is tested once; reports mean +- std over folds."""
+    from .data.split import kfold_splits
+    from .train.dataset import FeatureDataset
+    from .train.trainer import evaluate, load_checkpoint, predict, train
+
+    records = _manifest(cfg)
+    device = resolve_device(cfg["train"]["device"])
+    folds = kfold_splits(records, args.folds, cfg["split"]["val_ratio"], cfg["split"]["seed"])
+    base = work_path(cfg, "runs", args.name, "x").parent
+    per_fold = []
+    for fold in folds:
+        classes = fold["behavior_classes"]
+        train_ds, val_ds, test_ds = (
+            FeatureDataset(_subset(records, fold[n]), _feature_dir(cfg), classes, cfg["model"]["input"])
+            for n in ("train", "val", "test"))
+        run_dir = base / f"fold{fold['fold']}"
+        log.info("fold %d: train %d / val %d / test %d", fold["fold"], len(train_ds), len(val_ds), len(test_ds))
+        result = train(cfg, train_ds, val_ds, classes, device, run_dir)
+        model, ckpt = load_checkpoint(run_dir / "best.pt", device)
+        result["test"] = evaluate(predict(model, test_ds, device), classes, ckpt["threshold"])
+        with open(run_dir / "metrics.json", "w") as fh:
+            json.dump(result, fh, indent=2)
+        per_fold.append(result["test"])
+
+    keys = [("anomaly", "precision"), ("anomaly", "recall"), ("anomaly", "f1"), ("anomaly", "roc_auc"),
+            ("anomaly", "pr_auc"), ("behavior", "accuracy"), ("behavior", "macro_f1"),
+            ("end_to_end", "accuracy"), ("end_to_end", "macro_f1")]
+    summary = {}
+    for task, metric in keys:
+        vals = np.array([f[task].get(metric, np.nan) for f in per_fold], dtype=float)
+        summary[f"{task}.{metric}"] = {"mean": float(np.nanmean(vals)), "std": float(np.nanstd(vals)),
+                                       "folds": vals.round(4).tolist()}
+        print(f"{task + '.' + metric:<24} {np.nanmean(vals):.3f} +- {np.nanstd(vals):.3f}")
+    with open(base / "cv_summary.json", "w") as fh:
+        json.dump(summary, fh, indent=2)
+    print(f"\ncv -> {base}")
+
+
 def _print_metrics(result):
     for name in ("val", "test"):
         if name not in result:
@@ -315,6 +354,10 @@ def main(argv=None):
     tr = sub.add_parser("train", help="train temporal transformer + heads on extracted features")
     tr.add_argument("--name", default="baseline")
 
+    cv = sub.add_parser("cv", help="stratified k-fold cross-validation (more reliable on small data)")
+    cv.add_argument("--name", default="cv")
+    cv.add_argument("--folds", type=int, default=5)
+
     ev = sub.add_parser("evaluate")
     ev.add_argument("--ckpt", required=True)
     ev.add_argument("--split", default="test", choices=["train", "val", "test"])
@@ -337,7 +380,7 @@ def main(argv=None):
     cfg = load_config(args.config, args.set)
     {
         "index": cmd_index, "split": cmd_split, "track": cmd_track, "extract": cmd_extract,
-        "train": cmd_train, "evaluate": cmd_evaluate, "pseudo-label": cmd_pseudo_label, "infer": cmd_infer,
+        "train": cmd_train, "cv": cmd_cv, "evaluate": cmd_evaluate, "pseudo-label": cmd_pseudo_label, "infer": cmd_infer,
     }[args.cmd](cfg, args)
 
 

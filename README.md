@@ -50,6 +50,7 @@ abd extract                     # feature S3D -> outputs/features/s3d/*.npz
 abd --set model.input=frame  train --name baseline
 abd --set model.input=person train --name person
 abd --set model.input=both   train --name both
+abd cv --name cv_frame --folds 5          # 5-fold CV, mean ± std (nên dùng: dataset nhỏ)
 abd evaluate --ckpt outputs/runs/both/best.pt --split test
 abd pseudo-label --ckpt outputs/runs/both/best.pt      # đoạn thời gian nghi bất thường (pseudo label)
 abd infer --ckpt outputs/runs/both/best.pt --video x.mp4 --render x_out.mp4

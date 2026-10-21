@@ -46,3 +46,16 @@ def test_read_frames_handles_overrun(toy_dataset):
     assert set(frames) == {0, 10, 59, 500}
     assert frames[0].shape == (60, 80, 3)
     assert np.array_equal(frames[500], frames[59])  # past the end -> last real frame
+
+
+def test_kfold_tests_each_video_once(toy_dataset):
+    from abd.data.split import kfold_splits
+
+    recs = scan_dataset(toy_dataset)
+    folds = kfold_splits(recs, k=3, val_ratio=0.2, seed=0)
+    tested = [v for f in folds for v in f["test"]]
+    assert sorted(tested) == sorted(r.video_id for r in recs)
+    for f in folds:
+        parts = [set(f[k]) for k in ("train", "val", "test")]
+        assert not (parts[0] & parts[1] or parts[0] & parts[2] or parts[1] & parts[2])
+        assert set().union(*parts) == {r.video_id for r in recs}
