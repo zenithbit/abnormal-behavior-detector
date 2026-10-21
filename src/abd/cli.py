@@ -19,6 +19,18 @@ log = logging.getLogger("abd")
 
 
 # ---------------------------------------------------------------- helpers
+def _readable(path: Path, need: str | None = None) -> bool:
+    """True if a previous run left a complete .npy/.npz here (and it has key `need`, for .npz)."""
+    if not path.exists():
+        return False
+    try:
+        z = np.load(path)
+        return need is None or need in z.files
+    except Exception:
+        log.warning("unreadable %s (interrupted run?) -> recomputing", path)
+        return False
+
+
 def _manifest(cfg):
     from .data.index import read_manifest
 
@@ -112,7 +124,7 @@ def cmd_track(cfg, args):
     rendered = 0
     for rec in tqdm(records, desc="track"):
         out = out_dir / f"{rec.video_id}.npy"
-        if not out.exists() or args.overwrite:
+        if args.overwrite or not _readable(out):
             tracks = tracker.track_video(_video_path(cfg, rec), cfg["tracking"]["min_track_len"])
             save_tracks(tracks, out)
         if rendered < args.render:
@@ -136,10 +148,9 @@ def cmd_extract(cfg, args):
     log.info("backbone %s on %s, streams %s", f["backbone"], encoder.device, f["streams"])
     for rec in tqdm(records, desc="extract"):
         out = out_dir / f"{rec.video_id}.npz"
-        if out.exists() and not args.overwrite:
-            # a frame-only file is incomplete once the person stream is requested
-            if not use_person or "person" in np.load(out).files:
-                continue
+        # a frame-only file is incomplete once the person stream is requested
+        if not args.overwrite and _readable(out, "person" if use_person else "frame"):
+            continue
         tracks = None
         if use_person:
             tp = _tracks_dir(cfg) / f"{rec.video_id}.npy"
@@ -151,7 +162,10 @@ def cmd_extract(cfg, args):
             smp["num_segments"], smp["clip_len"], smp["max_frame_side"],
             tracks, f["max_persons"], f["crop_margin"],
         )
-        np.savez_compressed(out, **feats)
+        tmp = out.with_name(out.name + ".tmp")
+        with open(tmp, "wb") as fh:
+            np.savez_compressed(fh, **feats)
+        tmp.replace(out)
     print(f"features -> {out_dir}")
 
 
@@ -205,7 +219,8 @@ def cmd_cv(cfg, args):
             json.dump(result, fh, indent=2)
         per_fold.append(result["test"])
 
-    keys = [("anomaly", "precision"), ("anomaly", "recall"), ("anomaly", "f1"), ("anomaly", "roc_auc"),
+    keys = [("anomaly", "precision"), ("anomaly", "recall"), ("anomaly", "specificity"),
+            ("anomaly", "balanced_accuracy"), ("anomaly", "f1"), ("anomaly", "roc_auc"),
             ("anomaly", "pr_auc"), ("behavior", "accuracy"), ("behavior", "macro_f1"),
             ("end_to_end", "accuracy"), ("end_to_end", "macro_f1")]
     summary = {}
@@ -224,7 +239,7 @@ def _print_metrics(result):
         if name not in result:
             continue
         a, b, e = result[name]["anomaly"], result[name]["behavior"], result[name]["end_to_end"]
-        print(f"[{name}] anomaly  P {a['precision']:.3f} R {a['recall']:.3f} F1 {a['f1']:.3f} "
+        print(f"[{name}] anomaly  P {a['precision']:.3f} R {a['recall']:.3f} Spec {a['specificity']:.3f} F1 {a['f1']:.3f} "
               f"ROC-AUC {a['roc_auc']:.3f} PR-AUC {a['pr_auc']:.3f} (thr {a['threshold']:.3f})")
         if b.get("n"):
             print(f"[{name}] behavior acc {b['accuracy']:.3f} macro-F1 {b['macro_f1']:.3f} (n={b['n']})")

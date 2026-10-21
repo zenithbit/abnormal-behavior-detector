@@ -3,8 +3,26 @@ from __future__ import annotations
 import numpy as np
 from sklearn.metrics import (
     accuracy_score, average_precision_score, confusion_matrix, precision_recall_curve,
-    precision_recall_fscore_support, roc_auc_score,
+    precision_recall_fscore_support, roc_auc_score, roc_curve,
 )
+
+
+def select_threshold(y_true: np.ndarray, scores: np.ndarray, method: str = "youden") -> float:
+    """Pick the anomaly threshold on validation, then apply it unchanged to test.
+
+    youden: maximise recall + specificity - 1. Robust to class imbalance; with ~90% abnormal
+            videos, maximising F1 instead tends to flag almost everything as abnormal.
+    f1    : maximise F1 of the abnormal class.
+    """
+    if method == "f1":
+        return best_f1_threshold(y_true, scores)
+    if method != "youden":
+        raise ValueError(f"unknown threshold method {method!r}")
+    if len(np.unique(y_true)) < 2:
+        return 0.5
+    fpr, tpr, t = roc_curve(y_true, scores)
+    i = int(np.argmax(tpr - fpr))
+    return float(min(t[i], 1.0))
 
 
 def best_f1_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
@@ -20,9 +38,12 @@ def anomaly_metrics(y_true: np.ndarray, scores: np.ndarray, threshold: float) ->
     pred = (scores >= threshold).astype(int)
     p, r, f1, _ = precision_recall_fscore_support(y_true, pred, average="binary", zero_division=0)
     both = len(np.unique(y_true)) == 2
+    neg = y_true == 0
+    specificity = float((pred[neg] == 0).mean()) if neg.any() else float("nan")
     return {
         "threshold": threshold,
         "precision": float(p), "recall": float(r), "f1": float(f1),
+        "specificity": specificity, "balanced_accuracy": float((r + specificity) / 2),
         "roc_auc": float(roc_auc_score(y_true, scores)) if both else float("nan"),
         "pr_auc": float(average_precision_score(y_true, scores)) if both else float("nan"),
         "n": int(len(y_true)), "n_abnormal": int(y_true.sum()),

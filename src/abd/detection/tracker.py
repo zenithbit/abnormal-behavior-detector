@@ -55,7 +55,12 @@ def filter_short_tracks(tracks: np.ndarray, min_len: int) -> np.ndarray:
 
 
 def save_tracks(tracks: np.ndarray, path: str | Path) -> None:
-    np.save(path, tracks)
+    # write-then-rename: an interrupted run (Colab disconnect) never leaves a truncated file
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "wb") as f:
+        np.save(f, tracks)
+    tmp.replace(path)
 
 
 def load_tracks(path: str | Path) -> np.ndarray:

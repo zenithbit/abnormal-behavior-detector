@@ -43,6 +43,7 @@ train:
   weight_decay: 1.0e-2
   lambda_anomaly: 1.0
   lambda_behavior: 1.0
-  patience: 12            # early stopping on val PR-AUC
+  patience: 12            # early stopping on val ROC-AUC + behavior macro-F1
+  threshold: youden       # youden (balanced, default) | f1
   seed: 42
   device: auto

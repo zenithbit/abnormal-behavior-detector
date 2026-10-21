@@ -66,3 +66,16 @@ def test_threshold_and_end_to_end():
     e = end_to_end_metrics(y, np.array([-1, -1, 0, 1]), np.array([0.1, 0.2, 0.7, 0.9]),
                            np.array([0, 0, 0, 1]), thr, ["Fighting", "Theft"])
     assert e["accuracy"] == 1.0
+
+
+def test_youden_threshold_maximises_balanced_accuracy():
+    from abd.train.metrics import anomaly_metrics, select_threshold
+
+    rng = np.random.default_rng(0)
+    y = np.array([0] * 6 + [1] * 54)  # same imbalance as Ano-AAD
+    s = np.clip(np.where(y == 1, rng.normal(0.7, 0.15, 60), rng.normal(0.45, 0.15, 60)), 0, 1)
+    best = anomaly_metrics(y, s, select_threshold(y, s, "youden"))["balanced_accuracy"]
+    grid = max(anomaly_metrics(y, s, t)["balanced_accuracy"] for t in np.unique(s))
+    assert best == pytest.approx(grid)
+    f1 = anomaly_metrics(y, s, select_threshold(y, s, "f1"))
+    assert best >= f1["balanced_accuracy"]

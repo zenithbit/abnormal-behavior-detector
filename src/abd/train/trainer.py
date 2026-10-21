@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from ..models.head import AnomalyBehaviorModel, multitask_loss
 from .dataset import FeatureDataset, collate, to_device
-from .metrics import anomaly_metrics, behavior_metrics, best_f1_threshold, end_to_end_metrics
+from .metrics import anomaly_metrics, behavior_metrics, end_to_end_metrics, select_threshold
 
 log = logging.getLogger(__name__)
 
@@ -58,15 +58,17 @@ def evaluate(pred: dict, classes: list[str], threshold: float) -> dict:
 
 
 def _selection_key(pred: dict) -> tuple[float, float]:
-    """Model selection on val: (anomaly PR-AUC + behavior macro-F1, -val loss).
+    """Model selection on val: (anomaly ROC-AUC + behavior macro-F1, -val loss).
+
+    ROC-AUC rather than PR-AUC: with ~90% abnormal videos PR-AUC is near 1 for any model.
 
     The anomaly task often saturates early; including behavior F1 and breaking ties on
     loss keeps the behavior head from being frozen at an untrained epoch.
     """
-    from sklearn.metrics import average_precision_score, f1_score
+    from sklearn.metrics import f1_score, roc_auc_score
 
     y, s = pred["anomaly"], pred["score"]
-    score = float(average_precision_score(y, s)) if len(np.unique(y)) == 2 else float(((s >= 0.5) == y).mean())
+    score = float(roc_auc_score(y, s)) if len(np.unique(y)) == 2 else float(((s >= 0.5) == y).mean())
     beh = pred["behavior"]
     valid = beh >= 0
     eps = 1e-7
@@ -130,7 +132,7 @@ def train(cfg: dict, train_ds: FeatureDataset, val_ds: FeatureDataset, classes: 
 
     model = load_checkpoint(run_dir / "best.pt", device)[0]
     val_pred = predict(model, val_ds, device)
-    threshold = best_f1_threshold(val_pred["anomaly"], val_pred["score"])
+    threshold = select_threshold(val_pred["anomaly"], val_pred["score"], tc.get("threshold", "youden"))
     ckpt = torch.load(run_dir / "best.pt", map_location="cpu", weights_only=False)
     ckpt["threshold"] = threshold
     torch.save(ckpt, run_dir / "best.pt")
