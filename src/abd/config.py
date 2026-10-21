@@ -20,6 +20,16 @@ def _merge(base: dict, override: dict) -> dict:
     return out
 
 
+def _parse_value(raw: str) -> Any:
+    value = yaml.safe_load(raw)
+    if isinstance(value, str):  # YAML 1.1 reads "1e-4" (no dot) as a string
+        try:
+            return float(value)
+        except ValueError:
+            pass
+    return value
+
+
 def load_config(path: str | Path | None = None, overrides: list[str] | None = None) -> dict[str, Any]:
     """Load default config, merge a user YAML on top, then apply `a.b=value` overrides."""
     with open(DEFAULT_CONFIG) as f:
@@ -33,7 +43,7 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
         *parents, leaf = key.split(".")
         for p in parents:
             node = node.setdefault(p, {})
-        node[leaf] = yaml.safe_load(raw)
+        node[leaf] = _parse_value(raw)
     return cfg
 
 

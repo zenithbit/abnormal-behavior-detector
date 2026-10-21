@@ -42,7 +42,8 @@ class AnomalyBehaviorModel(nn.Module):
 
     def __init__(self, feat_dim: int, num_behaviors: int, input_mode: str = "frame",
                  d_model: int = 256, n_layers: int = 2, n_heads: int = 4,
-                 dropout: float = 0.3, topk_ratio: float = 0.125, max_segments: int = 512):
+                 dropout: float = 0.3, topk_ratio: float = 0.125, max_segments: int = 512,
+                 behavior_pool: str = "attn"):
         super().__init__()
         if input_mode not in {"frame", "person", "both"}:
             raise ValueError(f"input_mode must be frame|person|both, got {input_mode!r}")
@@ -61,7 +62,11 @@ class AnomalyBehaviorModel(nn.Module):
         self.in_drop = nn.Dropout(dropout)
         layer = nn.TransformerEncoderLayer(d_model, n_heads, 4 * d_model, dropout,
                                            batch_first=True, norm_first=True, activation="gelu")
-        self.temporal = nn.TransformerEncoder(layer, n_layers, enable_nested_tensor=False)
+        # n_layers=0 -> no temporal mixing (per-segment MLP); a useful ablation on small data
+        self.temporal = nn.TransformerEncoder(layer, n_layers, enable_nested_tensor=False) if n_layers else nn.Identity()
+        if behavior_pool not in {"attn", "mean"}:
+            raise ValueError(f"behavior_pool must be attn|mean, got {behavior_pool!r}")
+        self.behavior_pool = behavior_pool
         self.norm = nn.LayerNorm(d_model)
         self.anomaly_head = nn.Sequential(nn.Linear(d_model, d_model // 2), nn.GELU(),
                                           nn.Dropout(dropout), nn.Linear(d_model // 2, 1))
@@ -85,8 +90,12 @@ class AnomalyBehaviorModel(nn.Module):
         seg_logits = self.anomaly_head(h).squeeze(-1)            # [B, S]
         k = self.topk(seg_logits.shape[1])
         video_logit = seg_logits.topk(k, dim=1).values.mean(1)   # MIL: mean of top-k segments
-        attn = torch.softmax(seg_logits.detach(), dim=1)         # focus behavior on suspicious parts
-        behavior_logits = self.behavior_head((attn.unsqueeze(-1) * h).sum(1))
+        if self.behavior_pool == "attn":
+            attn = torch.softmax(seg_logits.detach(), dim=1)     # focus behavior on suspicious parts
+            pooled = (attn.unsqueeze(-1) * h).sum(1)
+        else:
+            pooled = h.mean(1)
+        behavior_logits = self.behavior_head(pooled)
         return {"segment_logits": seg_logits, "video_logit": video_logit, "behavior_logits": behavior_logits}
 
 

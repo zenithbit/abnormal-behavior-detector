@@ -35,6 +35,7 @@ model:
   n_heads: 4
   dropout: 0.3
   topk_ratio: 0.125       # MIL: top-k = ceil(S * ratio) segments
+  behavior_pool: attn     # attn (weighted by anomaly score) | mean
 
 train:
   epochs: 60

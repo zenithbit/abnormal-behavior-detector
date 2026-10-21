@@ -29,6 +29,7 @@ def build_model(cfg: dict, feat_dim: int, num_behaviors: int) -> AnomalyBehavior
     return AnomalyBehaviorModel(
         feat_dim=feat_dim, num_behaviors=num_behaviors, input_mode=m["input"], d_model=m["d_model"],
         n_layers=m["n_layers"], n_heads=m["n_heads"], dropout=m["dropout"], topk_ratio=m["topk_ratio"],
+        behavior_pool=m.get("behavior_pool", "attn"),
         max_segments=max(512, cfg["sampling"]["num_segments"]),
     )
 
