@@ -104,6 +104,15 @@ Phần nặng (tracking + trích feature) chạy trên Colab, kết quả mang v
    scripts/import_results.sh abd_results.zip
    ```
    `outputs/` cũ được đổi tên thành `outputs.bak.<thời gian>`. Sau đó train / cv / infer trên máy như bình thường.
+6. So sánh các luồng đầu vào × biến thể head (5-fold CV, ~10 phút), chọn model tốt nhất:
+   ```bash
+   scripts/compare_models.sh            # frame person both
+   ```
+7. Train model cuối với cấu hình thắng (ví dụ `both_notf_mean`) và đóng gói demo Windows:
+   ```bash
+   abd --set model.input=both --set model.n_layers=0 --set model.d_model=128 --set model.dropout=0.5 --set model.behavior_pool=mean train --name final
+   scripts/pack_demo.sh outputs/runs/final <video1.mp4> <video2.mp4> ...
+   ```
 
 ## Test
 
