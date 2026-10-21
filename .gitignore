@@ -2,12 +2,12 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-data/
-runs/
-outputs/
+/data/
+/runs/
+/outputs/
 *.pt
 !configs/*.pt
 .DS_Store
 *.egg-info/
 archive.zip
-dist/
+/dist/
